@@ -1,0 +1,43 @@
+{
+  "state": "review_required",
+  "contact": {
+    "fullName": "Maya Chen",
+    "firstName": "Maya",
+    "lastName": "Chen",
+    "company": "Brightline Studio",
+    "jobTitle": "Partnerships Lead",
+    "email": "maya@brightline.studio",
+    "mobilePhone": "+16025550184",
+    "officePhone": "+16025550185",
+    "website": "https://brightline.studio",
+    "address1": "44 E Monroe St",
+    "city": "Phoenix",
+    "state": "AZ",
+    "postalCode": "85004",
+    "country": "US",
+    "notes": "",
+    "source": "SnapShare",
+    "confidence": {
+      "fullName": 0.97,
+      "company": 0.95,
+      "jobTitle": 0.93,
+      "email": 0.98,
+      "mobilePhone": 0.86,
+      "officePhone": 0.86,
+      "website": 0.91,
+      "address1": 0.72
+    },
+    "lowConfidenceFields": ["mobilePhone", "address1"]
+  },
+  "review": {
+    "provider": "veryfi",
+    "needsManualReview": true,
+    "lowConfidenceFields": ["mobilePhone", "address1"],
+    "requiredFieldsMissing": [],
+    "warnings": []
+  },
+  "source": {
+    "provider": "veryfi",
+    "input": "business-card-image"
+  }
+}

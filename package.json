@@ -1,0 +1,37 @@
+{
+  "name": "snapshare-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "start": "vite preview --host 0.0.0.0",
+    "preview": "vite preview --host 0.0.0.0",
+    "convex:dev": "convex dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "api:dev": "tsx src/server/api/server.ts",
+    "video:studio": "remotion studio src/remotion/index.ts",
+    "video:render": "remotion render src/remotion/index.ts SnapShareLaunch out/snapshare-launch.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.457",
+    "@vitejs/plugin-react": "latest",
+    "convex": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "remotion": "^4.0.457",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "playwright": "^1.59.1",
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.5"
+  }
+}

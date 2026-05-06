@@ -6,7 +6,7 @@ export const RemotionRoot = () => {
     <Composition
       id="SnapShareLaunch"
       component={SnapShareLaunch}
-      durationInFrames={1080}
+      durationInFrames={1320}
       fps={30}
       width={1920}
       height={1080}

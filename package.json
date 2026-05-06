@@ -13,7 +13,7 @@
     "test": "vitest run",
     "api:dev": "tsx src/server/api/server.ts",
     "video:studio": "remotion studio src/remotion/index.ts",
-    "video:render": "remotion render src/remotion/index.ts SnapShareLaunch out/snapshare-launch.mp4"
+    "video:render": "remotion render src/remotion/index.ts SnapShareLaunch marketing-assets/videos/scanshare-launch.mp4"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.457",

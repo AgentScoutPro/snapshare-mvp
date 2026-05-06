@@ -13,7 +13,8 @@
     "test": "vitest run",
     "api:dev": "tsx src/server/api/server.ts",
     "video:studio": "remotion studio src/remotion/index.ts",
-    "video:render": "remotion render src/remotion/index.ts SnapShareLaunch marketing-assets/videos/scanshare-launch.mp4"
+    "video:render": "remotion render src/remotion/index.ts StopLosingLeads marketing-assets/videos/01-stop-losing-leads.mp4 && remotion render src/remotion/index.ts HandshakeToCrm marketing-assets/videos/02-handshake-to-crm.mp4 && remotion render src/remotion/index.ts NetworkingUpgrade marketing-assets/videos/03-networking-upgrade.mp4",
+    "video:render:loops": "remotion render src/remotion/index.ts StopLosingLeadsLoop marketing-assets/videos/01-stop-losing-leads-loop.mp4 && remotion render src/remotion/index.ts HandshakeToCrmLoop marketing-assets/videos/02-handshake-to-crm-loop.mp4 && remotion render src/remotion/index.ts NetworkingUpgradeLoop marketing-assets/videos/03-networking-upgrade-loop.mp4"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.457",

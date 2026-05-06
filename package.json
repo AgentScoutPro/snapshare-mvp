@@ -18,9 +18,11 @@
   },
   "dependencies": {
     "@remotion/cli": "^4.0.457",
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "latest",
     "convex": "latest",
     "lucide-react": "latest",
+    "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest",
     "remotion": "^4.0.457",

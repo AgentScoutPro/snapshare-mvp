@@ -49,6 +49,21 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: minmax(320px, 0.88fr) minmax(360px, 1fr);
@@ -71,7 +86,9 @@ button {
 
 .brand-logo {
   width: min(430px, 78vw);
+  max-height: 98px;
   height: auto;
+  object-fit: contain;
   filter: drop-shadow(0 0 26px rgba(181, 76, 255, 0.48));
   margin-bottom: 54px;
 }
@@ -254,6 +271,7 @@ button {
 
 .screen-stack {
   height: calc(100% - 150px);
+  min-height: 0;
   overflow: hidden;
   border-radius: 32px;
   background:
@@ -279,6 +297,7 @@ button {
 
 .screen {
   height: 100%;
+  min-height: 0;
   padding: 20px 20px 96px;
   display: flex;
   flex-direction: column;
@@ -297,7 +316,8 @@ button {
 
 .scan-hero {
   position: relative;
-  height: 148px;
+  min-height: 112px;
+  height: clamp(112px, 18vh, 148px);
   display: grid;
   place-items: center;
 }
@@ -452,7 +472,7 @@ button {
 }
 
 .camera-card {
-  min-height: 218px;
+  min-height: 196px;
   border-radius: 30px;
   background: linear-gradient(145deg, rgba(32, 165, 255, 0.18), rgba(181, 76, 255, 0.12));
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -463,10 +483,14 @@ button {
 }
 
 .camera-card.professional {
-  min-height: 244px;
+  min-height: 216px;
   background:
     linear-gradient(rgba(9, 14, 26, 0.5), rgba(9, 14, 26, 0.5)),
     linear-gradient(145deg, rgba(32, 165, 255, 0.16), rgba(181, 76, 255, 0.1));
+}
+
+.camera-card.scanning .edge {
+  animation: scanPulse 1.1s ease-in-out infinite alternate;
 }
 
 .camera-card::before {
@@ -552,7 +576,7 @@ button {
 }
 
 .business-card {
-  width: 248px;
+  width: min(248px, 78%);
   padding: 22px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.96);
@@ -587,10 +611,68 @@ button {
   line-height: 1.45;
 }
 
+.empty-card {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  text-align: center;
+  transform: none;
+}
+
+.empty-card svg {
+  color: #7c42db;
+}
+
+.empty-card strong {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+
+.scan-loading {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  z-index: 1;
+  color: var(--text);
+  text-align: center;
+}
+
+.scan-loading svg {
+  color: var(--cyan);
+  animation: spin 1s linear infinite;
+}
+
+.scan-loading strong {
+  font-size: 20px;
+}
+
+.scan-loading span {
+  max-width: 210px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ocr-error,
+.ocr-warning-list {
+  display: flex;
+  gap: 9px;
+  padding: 11px 13px;
+  border-radius: 16px;
+  color: var(--amber);
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.2);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ocr-warning-list {
+  display: grid;
+}
+
 .scan-copy h2,
 .screen-title h2 {
   margin: 0;
-  font-size: 28px;
+  font-size: clamp(22px, 6.2vw, 28px);
   line-height: 1;
   letter-spacing: 0;
 }
@@ -696,6 +778,18 @@ button {
   font-weight: 850;
   text-transform: uppercase;
   margin-bottom: 6px;
+}
+
+.field.low-confidence {
+  border-color: rgba(255, 209, 102, 0.42);
+  background: rgba(255, 209, 102, 0.08);
+}
+
+.field span em {
+  float: right;
+  color: var(--amber);
+  font-style: normal;
+  text-transform: none;
 }
 
 .field input,
@@ -951,17 +1045,38 @@ button {
 
 .digital-card {
   padding: 16px;
+  display: grid;
+  justify-items: center;
+  text-align: center;
 }
 
 .digital-card img {
-  width: 162px;
+  width: 172px;
   max-width: 100%;
   margin-bottom: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 10px;
 }
 
 .digital-card strong,
-.digital-card span {
+.digital-card span,
+.digital-card small {
   display: block;
+}
+
+.digital-card strong {
+  font-size: 20px;
+}
+
+.digital-card span,
+.digital-card small {
+  color: var(--muted);
+}
+
+.digital-card small {
+  margin-top: 6px;
+  font-weight: 800;
 }
 
 .success-screen {
@@ -983,7 +1098,7 @@ button {
 
 .success-screen h2 {
   margin: 0;
-  font-size: 42px;
+  font-size: clamp(30px, 9vw, 42px);
 }
 
 .success-screen > p {
@@ -1005,6 +1120,24 @@ button {
   gap: 10px;
 }
 
+.empty-history {
+  padding: 18px;
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.empty-history strong,
+.empty-history span {
+  display: block;
+}
+
+.empty-history strong {
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
 .history-item,
 .settings-row {
   display: grid;
@@ -1015,6 +1148,22 @@ button {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scanPulse {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .history-item strong,
@@ -1148,15 +1297,21 @@ button {
   .app-shell {
     grid-template-columns: 1fr;
     padding: 24px;
+    gap: 28px;
+    align-items: start;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   .brand-panel {
     min-height: auto;
     text-align: left;
+    justify-content: flex-start;
   }
 
   .brand-logo {
     width: 280px;
+    max-height: 64px;
     margin-bottom: 24px;
   }
 
@@ -1174,6 +1329,10 @@ button {
     margin-top: 24px;
   }
 
+  .orb {
+    max-width: 100vw;
+  }
+
   .phone {
     height: 780px;
   }
@@ -1181,26 +1340,135 @@ button {
 
 @media (max-width: 440px) {
   .app-shell {
-    padding: 16px;
+    padding: 16px 12px 18px;
+    gap: 22px;
   }
 
   .phone {
     width: 100%;
-    min-height: 720px;
+    height: min(740px, calc(100vh - 24px));
+    min-height: 640px;
     border-radius: 38px;
     padding: 10px;
   }
 
+  .status-bar {
+    padding: 12px 14px 4px;
+  }
+
+  .app-header {
+    margin: 4px 2px 10px;
+    padding: 12px;
+    border-radius: 24px;
+  }
+
+  .app-header strong {
+    font-size: 20px;
+  }
+
+  .header-badge {
+    height: 36px;
+    padding: 0 10px;
+  }
+
   .hero-copy h1 {
-    font-size: 38px;
+    font-size: clamp(32px, 10vw, 38px);
+    line-height: 0.98;
+  }
+
+  .hero-copy p {
+    font-size: 15px;
+  }
+
+  .brand-logo {
+    width: min(240px, 72vw);
+    max-height: 54px;
+  }
+
+  .brand-mascot {
+    margin-top: 18px;
+    transform: scale(0.78);
+    transform-origin: left center;
+  }
+
+  .mini-card {
+    width: 100%;
+    border-radius: 28px;
+  }
+
+  .orb {
+    display: none;
   }
 
   .screen {
-    padding: 16px 16px 96px;
+    padding: 14px 14px 88px;
+    gap: 10px;
+  }
+
+  .powered-by {
+    display: none;
+  }
+
+  .scan-hero {
+    min-height: 96px;
+  }
+
+  .screen-mascot {
+    transform: scale(0.85);
+  }
+
+  .camera-card,
+  .camera-card.professional {
+    min-height: 176px;
+  }
+
+  .business-card {
+    padding: 18px;
+  }
+
+  .business-card strong {
+    margin-top: 16px;
+    font-size: 22px;
+  }
+
+  .capture-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 6px;
+  }
+
+  .mode-pill,
+  .icon-pill,
+  .info-pill {
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .flow-strip span {
+    font-size: 9px;
+  }
+
+  .confidence-grid,
+  .team-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-grid,
+  .action-split,
+  .history-actions {
+    flex-direction: column;
+  }
+
+  .action-split .secondary-action,
+  .action-split .primary-action,
+  .history-actions .secondary-action {
+    width: 100%;
   }
 
   .bottom-nav {
-    left: 20px;
-    right: 20px;
+    left: 16px;
+    right: 16px;
+    bottom: 18px;
+    height: 62px;
   }
 }

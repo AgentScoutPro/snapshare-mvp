@@ -7,11 +7,24 @@ const PORT = Number(process.env.PORT ?? 8787);
 
 const server = createServer(
   async (request: IncomingMessage, response: ServerResponse) => {
+    const headers = {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+    };
+
+    if (request.method === "OPTIONS") {
+      response.writeHead(204, headers);
+      response.end();
+      return;
+    }
+
     if (request.method === "POST" && request.url === "/ocr/business-card") {
       const body = await readJsonBody(request);
       const result = await handleBusinessCardOcrRequest(body);
 
-      response.writeHead(result.status, { "Content-Type": "application/json" });
+      response.writeHead(result.status, headers);
       response.end(JSON.stringify(result.body));
       return;
     }
@@ -27,12 +40,12 @@ const server = createServer(
         enrollWorkflow: body.enrollWorkflow === true,
       });
 
-      response.writeHead(result.status, { "Content-Type": "application/json" });
+      response.writeHead(result.status, headers);
       response.end(JSON.stringify(result.body));
       return;
     }
 
-    response.writeHead(404, { "Content-Type": "application/json" });
+    response.writeHead(404, headers);
     response.end(
       JSON.stringify({
         error: {

@@ -16,10 +16,12 @@ import {
   Mail,
   MapPin,
   MessageSquare,
+  QrCode,
   RefreshCw,
   Save,
   ScanLine,
   Send,
+  Share2,
   Settings,
   ShieldCheck,
   Tags,
@@ -28,11 +30,23 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import QRCode from "qrcode";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PixelOwl } from "./components/PixelOwl";
 import { appCopy } from "./content/appCopy";
-import { sampleContact } from "./data/sampleContact";
-import type { CapturedContact, FollowUpChannel, SyncStep } from "./lib/types";
+import { mapOcrReviewPayloadToCapturedContact } from "./lib/ocrReview";
+import {
+  buildVCard,
+  contactToVCardProfile,
+  createVCardFileName,
+} from "./lib/vcard";
+import type {
+  CapturedContact,
+  ContactConfidenceField,
+  FollowUpChannel,
+  SyncStep,
+  UserProfile,
+} from "./lib/types";
 
 type Screen =
   | "scan"
@@ -49,13 +63,52 @@ const crmStages = ["Event Lead", "VIP Follow Up", "Partner", "Newsletter"];
 const owners = ["Avery Stone", "Jordan Lee", "Morgan Patel"];
 const opportunityStages = ["New Lead", "Qualified", "Booked", "Nurture"];
 const leadStatuses = ["Warm", "Hot", "Cold"];
+const defaultProfile: UserProfile = {
+  name: "Avery Stone",
+  title: "Founder",
+  company: "SnapShare",
+  email: "avery@snapshare.app",
+  phone: "(602) 555-0199",
+  website: "https://snapshare.app/avery",
+  notes: "SnapShare digital card",
+};
+const emptyContact: CapturedContact = {
+  name: "",
+  title: "",
+  company: "",
+  email: "",
+  phone: "",
+  website: "",
+  source: "SnapShare",
+  tags: "business-card-scan",
+  owner: "Avery Stone",
+  notes: "",
+  crmStage: "Event Lead",
+  pipeline: "Sales Pipeline",
+  opportunityStage: "New Lead",
+  opportunityValue: "",
+  leadStatus: "Warm",
+  followUpDate: "Tomorrow 10:00 AM",
+  consentStatus: "Needs consent",
+  followUpChannel: "Text",
+  followUpMessage: "",
+  syncStatus: "queued",
+  confidence: {},
+  lowConfidenceFields: [],
+  ocrWarnings: [],
+};
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<Screen>("scan");
-  const [scanState, setScanState] = useState<"idle" | "captured" | "saved">(
-    "idle",
-  );
-  const [contact, setContact] = useState<CapturedContact>(sampleContact);
+  const [scanState, setScanState] = useState<
+    "idle" | "scanning" | "captured" | "saved" | "error"
+  >("idle");
+  const [ocrError, setOcrError] = useState("");
+  const [contact, setContact] = useState<CapturedContact>(emptyContact);
+  const [profile, setProfile] = useState<UserProfile>(() => {
+    const saved = window.localStorage.getItem("snapshare.profile");
+    return saved ? (JSON.parse(saved) as UserProfile) : defaultProfile;
+  });
   const [savedContacts, setSavedContacts] = useState<CapturedContact[]>(() => {
     const saved = window.localStorage.getItem("snapshare.contacts");
     return saved ? (JSON.parse(saved) as CapturedContact[]) : [];
@@ -97,6 +150,50 @@ function App() {
 
   const updateContact = (key: keyof CapturedContact, value: string) => {
     setContact((current) => ({ ...current, [key]: value }));
+  };
+
+  const updateProfile = (key: keyof UserProfile, value: string) => {
+    setProfile((current) => {
+      const next = { ...current, [key]: value };
+      window.localStorage.setItem("snapshare.profile", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const scanBusinessCard = async (file: File) => {
+    setScanState("scanning");
+    setOcrError("");
+
+    try {
+      const imageDataUrl = await readFileAsDataUrl(file);
+      const response = await fetch("/ocr/business-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageDataUrl,
+          mimeType: file.type || "image/jpeg",
+          source: file.name,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.error?.message ?? "SnapShare could not read this card.",
+        );
+      }
+
+      setContact(mapOcrReviewPayloadToCapturedContact(payload));
+      setScanState("captured");
+      setActiveScreen("review");
+    } catch (error) {
+      setOcrError(
+        error instanceof Error
+          ? error.message
+          : "SnapShare could not read this card.",
+      );
+      setScanState("error");
+    }
   };
 
   const saveContact = () => {
@@ -146,10 +243,8 @@ function App() {
             {activeScreen === "scan" && (
               <ScanScreen
                 scanState={scanState}
-                onCapture={() => {
-                  setScanState("captured");
-                  setActiveScreen("review");
-                }}
+                ocrError={ocrError}
+                onCapture={scanBusinessCard}
               />
             )}
             {activeScreen === "review" && (
@@ -185,6 +280,9 @@ function App() {
               <SuccessScreen
                 contact={contact}
                 steps={syncSteps}
+                onSaveToDevice={() =>
+                  downloadVCard(contactToVCardProfile(contact))
+                }
                 onCreateFollowUp={() => setActiveScreen("follow")}
                 onNewScan={() => {
                   setScanState("idle");
@@ -196,9 +294,14 @@ function App() {
               <HistoryScreen
                 contacts={savedContacts}
                 onRetry={() => setActiveScreen("sync")}
+                onSaveToDevice={(item) =>
+                  downloadVCard(contactToVCardProfile(item))
+                }
               />
             )}
-            {activeScreen === "settings" && <SettingsScreen />}
+            {activeScreen === "settings" && (
+              <ProfileScreen profile={profile} updateProfile={updateProfile} />
+            )}
             {activeScreen === "team" && <TeamScreen updateContact={updateContact} />}
           </div>
           <div className="powered-by">Powered by C0D3AI</div>
@@ -264,13 +367,41 @@ function AppHeader({ savedCount }: { savedCount: number }) {
 
 function ScanScreen({
   scanState,
+  ocrError,
   onCapture,
 }: {
-  scanState: "idle" | "captured" | "saved";
-  onCapture: () => void;
+  scanState: "idle" | "scanning" | "captured" | "saved" | "error";
+  ocrError: string;
+  onCapture: (file: File) => void;
 }) {
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const isScanning = scanState === "scanning";
+  const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onCapture(file);
+    }
+    event.target.value = "";
+  };
+
   return (
     <section className="screen scan-screen">
+      <input
+        className="visually-hidden"
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFile}
+      />
+      <input
+        className="visually-hidden"
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFile}
+      />
       <div className="flow-strip" aria-label="Primary workflow">
         {appCopy.flow.map((step, index) => (
           <span className={index === 0 ? "active" : ""} key={step}>
@@ -282,35 +413,57 @@ function ScanScreen({
       <div className="capture-toolbar">
         <button className="mode-pill active">Front</button>
         <button className="mode-pill">Back</button>
-        <button className="icon-pill">
+        <button
+          className="icon-pill"
+          disabled={isScanning}
+          onClick={() => uploadInputRef.current?.click()}
+        >
           <Upload size={16} />
           Upload
         </button>
       </div>
 
-      <div className="camera-card professional">
+      <div className={`camera-card professional ${isScanning ? "scanning" : ""}`}>
         <div className="edge edge-top" />
         <div className="edge edge-right" />
         <div className="edge edge-bottom" />
         <div className="edge edge-left" />
-        <div className="business-card">
-          <span>Brightline Studio</span>
-          <strong>Maya Chen</strong>
-          <small>Partnerships Lead</small>
-          <small>maya@brightline.studio</small>
-        </div>
+        {isScanning ? (
+          <div className="scan-loading">
+            <RefreshCw size={28} />
+            <strong>Reading card</strong>
+            <span>OCR is extracting contact fields...</span>
+          </div>
+        ) : (
+          <div className="business-card empty-card">
+            <ScanLine size={26} />
+            <strong>Place a business card in frame</strong>
+            <small>Snap or upload a clear card image.</small>
+          </div>
+        )}
       </div>
+
+      {scanState === "error" && (
+        <div className="ocr-error" role="alert">
+          <AlertTriangle size={17} />
+          <span>{ocrError}</span>
+        </div>
+      )}
 
       <div className="scan-copy">
         <PixelOwl className="screen-mascot" pose="Neutral" size={120} />
         <h2>
-          {scanState === "idle"
+          {scanState === "idle" || scanState === "error"
             ? appCopy.scan.headline
+            : scanState === "scanning"
+              ? "Scanning card"
             : appCopy.scan.capturedHeadline}
         </h2>
         <p>
-          {scanState === "idle"
+          {scanState === "idle" || scanState === "error"
             ? appCopy.scan.subheadline
+            : scanState === "scanning"
+              ? "Keep this screen open while SnapShare prepares the review."
             : appCopy.scan.capturedSubheadline}
         </p>
       </div>
@@ -320,9 +473,13 @@ function ScanScreen({
         <InfoPill icon={<ShieldCheck size={15} />} label="Direct GHL sync" />
       </div>
 
-      <button className="primary-action" onClick={onCapture}>
+      <button
+        className="primary-action"
+        disabled={isScanning}
+        onClick={() => cameraInputRef.current?.click()}
+      >
         <Camera size={20} />
-        {scanState === "idle" ? appCopy.scan.primaryCta : appCopy.scan.reviewCta}
+        {isScanning ? "Scanning..." : appCopy.scan.primaryCta}
       </button>
     </section>
   );
@@ -352,15 +509,24 @@ function ReviewScreen({
         </div>
       </div>
       <div className="confidence-grid">
-        <Metric label="Name" value="99%" />
-        <Metric label="Email" value="98%" />
-        <Metric label="Phone" value="88%" tone="warn" />
+        <ConfidenceMetric contact={contact} field="name" label="Name" />
+        <ConfidenceMetric contact={contact} field="email" label="Email" />
+        <ConfidenceMetric contact={contact} field="phone" label="Phone" />
       </div>
-      <EditableField label="Name" value={contact.name} onChange={(v) => updateContact("name", v)} />
-      <EditableField label="Title" value={contact.title} onChange={(v) => updateContact("title", v)} />
-      <EditableField label="Company" value={contact.company} onChange={(v) => updateContact("company", v)} />
-      <EditableField label="Email" value={contact.email} onChange={(v) => updateContact("email", v)} />
-      <EditableField label="Phone" value={contact.phone} onChange={(v) => updateContact("phone", v)} />
+      {!!contact.ocrWarnings?.length && (
+        <div className="ocr-warning-list">
+          {contact.ocrWarnings.map((warning) => (
+            <span key={warning}>{warning}</span>
+          ))}
+        </div>
+      )}
+      <EditableField label="Name" value={contact.name} lowConfidence={isLowConfidence(contact, "name")} onChange={(v) => updateContact("name", v)} />
+      <EditableField label="Title" value={contact.title} lowConfidence={isLowConfidence(contact, "title")} onChange={(v) => updateContact("title", v)} />
+      <EditableField label="Company" value={contact.company} lowConfidence={isLowConfidence(contact, "company")} onChange={(v) => updateContact("company", v)} />
+      <EditableField label="Email" value={contact.email} lowConfidence={isLowConfidence(contact, "email")} onChange={(v) => updateContact("email", v)} />
+      <EditableField label="Phone" value={contact.phone} lowConfidence={isLowConfidence(contact, "phone")} onChange={(v) => updateContact("phone", v)} />
+      <EditableField label="Website" value={contact.website} lowConfidence={isLowConfidence(contact, "website")} onChange={(v) => updateContact("website", v)} />
+      <EditableField label="Notes" value={contact.notes} lowConfidence={isLowConfidence(contact, "address")} onChange={(v) => updateContact("notes", v)} />
       <button className="primary-action sticky-action" onClick={onContinue}>
         {appCopy.review.cta}
         <ChevronRight size={20} />
@@ -541,11 +707,13 @@ function FollowUpScreen({
 function SuccessScreen({
   contact,
   steps,
+  onSaveToDevice,
   onCreateFollowUp,
   onNewScan,
 }: {
   contact: CapturedContact;
   steps: SyncStep[];
+  onSaveToDevice: () => void;
   onCreateFollowUp: () => void;
   onNewScan: () => void;
 }) {
@@ -567,6 +735,10 @@ function SuccessScreen({
           </div>
         ))}
       </div>
+      <button className="secondary-action" onClick={onSaveToDevice}>
+        <ContactRound size={16} />
+        Save vCard to Contacts
+      </button>
       <button className="primary-action" onClick={onCreateFollowUp}>
         {appCopy.success.primaryCta}
       </button>
@@ -580,22 +752,15 @@ function SuccessScreen({
 function HistoryScreen({
   contacts,
   onRetry,
+  onSaveToDevice,
 }: {
   contacts: CapturedContact[];
   onRetry: () => void;
+  onSaveToDevice: (contact: CapturedContact) => void;
 }) {
   const history = contacts.length
     ? contacts
-    : [
-        { ...sampleContact, syncStatus: "synced" as const },
-        {
-          ...sampleContact,
-          name: "Noah Rivera",
-          company: "Mesa Realty Group",
-          source: "Open House",
-          syncStatus: "failed" as const,
-        },
-      ];
+    : [];
 
   return (
     <section className="screen history-screen">
@@ -618,7 +783,7 @@ function HistoryScreen({
         </button>
       </div>
       <div className="history-list">
-        {history.map((item) => (
+        {history.length ? history.map((item) => (
           <div className="history-item" key={`${item.name}-${item.source}`}>
             <div>
               <strong>{item.name}</strong>
@@ -630,30 +795,84 @@ function HistoryScreen({
                 {appCopy.leads.retryCta}
               </button>
             ) : (
-              <span className="status-chip synced">{appCopy.microcopy.syncedToGhl}</span>
+              <button className="retry-button" onClick={() => onSaveToDevice(item)}>
+                <ContactRound size={14} />
+                vCard
+              </button>
             )}
           </div>
-        ))}
+        )) : (
+          <div className="empty-history">
+            <strong>No scanned contacts yet</strong>
+            <span>Saved OCR reviews will appear here after sync.</span>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function SettingsScreen() {
+function ProfileScreen({
+  profile,
+  updateProfile,
+}: {
+  profile: UserProfile;
+  updateProfile: (key: keyof UserProfile, value: string) => void;
+}) {
+  const [qrCode, setQrCode] = useState("");
+  const vcard = useMemo(() => buildVCard(profile), [profile]);
+
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(vcard, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 220,
+      color: {
+        dark: "#05020c",
+        light: "#ffffff",
+      },
+    }).then((dataUrl) => {
+      if (!cancelled) {
+        setQrCode(dataUrl);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vcard]);
+
   return (
     <section className="screen settings-screen">
       <PixelOwl className="screen-mascot" pose="Perched" size={120} />
       <ScreenTitle
-        icon={<Settings size={20} />}
-        title={appCopy.settings.headline}
-        subtitle={appCopy.settings.subheadline}
+        icon={<QrCode size={20} />}
+        title="My SnapShare Card"
+        subtitle="Build your profile, show the QR, or share a vCard people can save."
       />
-      <SettingsRow icon={<Cloud size={18} />} title={appCopy.settings.sections.goHighLevel} detail="Connected - Agency Pipeline" />
-      <SettingsRow icon={<Workflow size={18} />} title={appCopy.settings.sections.fieldMapping} detail="Email, phone, tags, source, owner" />
-      <SettingsRow icon={<Tags size={18} />} title={appCopy.settings.sections.defaultTags} detail="event, scanned-card, warm-lead" />
-      <SettingsRow icon={<MessageSquare size={18} />} title={appCopy.settings.sections.followUpTemplates} detail="SMS and email follow-ups" />
-      <SettingsRow icon={<Download size={18} />} title={appCopy.settings.sections.exportContacts} detail="Phone contacts, CRM records, CSV backup" />
-      <SettingsRow icon={<ShieldCheck size={18} />} title={appCopy.settings.sections.backupPrivacy} detail="Delete, export, and consent records" />
+      <div className="digital-card">
+        {qrCode && <img src={qrCode} alt="SnapShare vCard QR code" />}
+        <strong>{profile.name}</strong>
+        <span>{profile.title} · {profile.company}</span>
+        <small>Scan to save this SnapShare vCard.</small>
+      </div>
+      <div className="action-split">
+        <button className="secondary-action" onClick={() => downloadVCard(profile)}>
+          <Download size={16} />
+          Save vCard
+        </button>
+        <button className="primary-action" onClick={() => shareVCard(profile)}>
+          <Share2 size={16} />
+          Share Card
+        </button>
+      </div>
+      <EditableField label="Name" value={profile.name} onChange={(value) => updateProfile("name", value)} />
+      <EditableField label="Title" value={profile.title} onChange={(value) => updateProfile("title", value)} />
+      <EditableField label="Company" value={profile.company} onChange={(value) => updateProfile("company", value)} />
+      <EditableField label="Email" value={profile.email} onChange={(value) => updateProfile("email", value)} />
+      <EditableField label="Phone" value={profile.phone} onChange={(value) => updateProfile("phone", value)} />
+      <EditableField label="Website" value={profile.website} onChange={(value) => updateProfile("website", value)} />
     </section>
   );
 }
@@ -721,15 +940,20 @@ function ScreenTitle({
 function EditableField({
   label,
   value,
+  lowConfidence = false,
   onChange,
 }: {
   label: string;
   value: string;
+  lowConfidence?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="field">
-      <span>{label}</span>
+    <label className={lowConfidence ? "field low-confidence" : "field"}>
+      <span>
+        {label}
+        {lowConfidence && <em>Review</em>}
+      </span>
       <input value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
@@ -773,6 +997,72 @@ function Metric({
       <strong>{value}</strong>
     </div>
   );
+}
+
+function ConfidenceMetric({
+  contact,
+  field,
+  label,
+}: {
+  contact: CapturedContact;
+  field: ContactConfidenceField;
+  label: string;
+}) {
+  const value = contact.confidence?.[field];
+  const percent = value === undefined ? "--" : `${Math.round(value * 100)}%`;
+  return (
+    <Metric
+      label={label}
+      value={percent}
+      tone={isLowConfidence(contact, field) ? "warn" : undefined}
+    />
+  );
+}
+
+function isLowConfidence(
+  contact: CapturedContact,
+  field: ContactConfidenceField,
+): boolean {
+  return contact.lowConfidenceFields?.includes(field) ?? false;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read the selected image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function downloadVCard(profile: UserProfile) {
+  const blob = new Blob([buildVCard(profile)], { type: "text/vcard;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = createVCardFileName(profile);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function shareVCard(profile: UserProfile) {
+  const vcard = buildVCard(profile);
+  const file = new File([vcard], createVCardFileName(profile), {
+    type: "text/vcard",
+  });
+
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    await navigator.share({
+      title: `${profile.name} SnapShare card`,
+      text: "Save my SnapShare vCard.",
+      files: [file],
+    });
+    return;
+  }
+
+  downloadVCard(profile);
 }
 
 function InfoPill({ icon, label }: { icon: React.ReactNode; label: string }) {

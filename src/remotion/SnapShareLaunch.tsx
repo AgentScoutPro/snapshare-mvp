@@ -15,9 +15,14 @@ import followUp from "../../marketing-assets/screens/10-ai-follow-up-generator.p
 import events from "../../marketing-assets/screens/11-events-screen.png";
 import scan from "../../marketing-assets/screens/14-scan-screen.png";
 import scannedResult from "../../marketing-assets/screens/15-scanned-card-result.png";
+import meetingScan from "../../marketing-assets/lifestyle/01-meeting-scan.png";
+import crmEvent from "../../marketing-assets/lifestyle/02-crm-event.png";
+import fieldLunch from "../../marketing-assets/lifestyle/03-field-lunch.png";
+import openHouse from "../../marketing-assets/lifestyle/04-open-house.png";
 
 type Variant = "leads" | "crm" | "upgrade";
 type Mode = "full" | "loop";
+type LifestyleVariant = "meetings" | "field" | "openHouse";
 
 type Scene = {
   text: string;
@@ -30,6 +35,7 @@ type Scene = {
 const fps = 30;
 const fullDuration = 480;
 const loopDuration = 150;
+const lifestyleDuration = 360;
 const url = "getthesnapshareapp.com";
 const ease = Easing.bezier(0.16, 1, 0.3, 1);
 
@@ -126,7 +132,84 @@ export const StopLosingLeadsLoop = () => <SnapShareMarketing variant="leads" mod
 export const HandshakeToCrmLoop = () => <SnapShareMarketing variant="crm" mode="loop" />;
 export const NetworkingUpgradeLoop = () => <SnapShareMarketing variant="upgrade" mode="loop" />;
 
-const buildTimeline = (scenes: Scene[]) => {
+type LifestyleScene = {
+  text: string;
+  asset: string;
+  duration: number;
+  align?: "top" | "bottom";
+  tag?: string;
+};
+
+const lifestyleVariants: Record<LifestyleVariant, { final: string; scenes: LifestyleScene[] }> = {
+  meetings: {
+    final: "Every card becomes a follow-up.",
+    scenes: [
+      { text: "Meet them in the moment", asset: meetingScan, duration: 90, align: "top" },
+      { text: "Scan before the conversation moves on", asset: crmEvent, duration: 90, align: "bottom", tag: "No lost names" },
+      { text: "Send clean leads to GoHighLevel", asset: meetingScan, duration: 90, align: "top", tag: "CRM ready" },
+      { text: "Scan. Sync. Follow up.", asset: crmEvent, duration: 90, align: "bottom" },
+    ],
+  },
+  field: {
+    final: "Built for work that happens anywhere.",
+    scenes: [
+      { text: "Leads do not only happen at conferences", asset: fieldLunch, duration: 90, align: "top" },
+      { text: "Capture the card at lunch", asset: meetingScan, duration: 90, align: "bottom" },
+      { text: "Follow up while it is still fresh", asset: fieldLunch, duration: 90, align: "top", tag: "Lead saved" },
+      { text: "Turn quick chats into clients", asset: contacts, duration: 90, align: "bottom" },
+    ],
+  },
+  openHouse: {
+    final: "Download ScanShare.",
+    scenes: [
+      { text: "Open house. Real leads.", asset: openHouse, duration: 90, align: "top" },
+      { text: "Capture every guest card", asset: openHouse, duration: 90, align: "bottom", tag: "Scan ready" },
+      { text: "Organize by event", asset: events, duration: 90, align: "top" },
+      { text: "Follow up before they tour the next place", asset: followUp, duration: 90, align: "bottom" },
+    ],
+  },
+};
+
+export const MeetingMoment = () => <LifestyleMarketing variant="meetings" />;
+export const FieldFollowUp = () => <LifestyleMarketing variant="field" />;
+export const OpenHouseLeads = () => <LifestyleMarketing variant="openHouse" />;
+
+const LifestyleMarketing = ({ variant }: { variant: LifestyleVariant }) => {
+  const frame = useCurrentFrame();
+  const config = lifestyleVariants[variant];
+  const timeline = buildTimeline(config.scenes);
+  const active = timeline.find((item) => frame >= item.start && frame < item.end) ?? timeline[timeline.length - 1];
+  const local = frame - active.start;
+  const finalShowing = frame >= lifestyleDuration - 54;
+  const finalIn = interpolate(frame, [lifestyleDuration - 54, lifestyleDuration - 18], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: ease,
+  });
+
+  return (
+    <AbsoluteFill style={styles.root}>
+      <LifestyleImage scene={active.scene} local={local} sceneIndex={active.index} />
+      <div style={styles.photoShade} />
+      {!finalShowing ? <LifestyleHeadline scene={active.scene} local={local} /> : null}
+      {!finalShowing && active.scene.tag ? <LifestyleTag text={active.scene.tag} local={local} /> : null}
+      {!finalShowing ? <div style={styles.lifestyleFooter}>{url}</div> : null}
+      <div
+        style={{
+          ...styles.lifestyleFinal,
+          opacity: finalIn,
+          transform: `translateY(${interpolate(finalIn, [0, 1], [22, 0])}px)`,
+        }}
+      >
+        <div style={styles.logo}>ScanShare</div>
+        <div style={styles.lifestyleFinalText}>{config.final}</div>
+        <div style={styles.finalUrl}>{url}</div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const buildTimeline = <T extends { duration: number }>(scenes: T[]) => {
   let start = 0;
   return scenes.map((scene, index) => {
     const item = { scene, index, start, end: start + scene.duration };
@@ -153,6 +236,68 @@ const Phone = ({ scene, local, sceneIndex }: { scene: Scene; local: number; scen
       </div>
     </div>
   );
+};
+
+const LifestyleImage = ({
+  scene,
+  local,
+  sceneIndex,
+}: {
+  scene: LifestyleScene;
+  local: number;
+  sceneIndex: number;
+}) => {
+  const { fps: videoFps } = useVideoConfig();
+  const entry = spring({ frame: local, fps: videoFps, config: { damping: 22, stiffness: 96 } });
+  const swipe = interpolate(entry, [0, 1], [sceneIndex % 2 === 0 ? 120 : -120, 0]);
+  const zoom = interpolate(local, [0, scene.duration], [1.02, 1.09], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <Img
+      src={scene.asset}
+      style={{
+        ...styles.lifestyleImage,
+        transform: `translateX(${swipe}px) scale(${zoom})`,
+      }}
+    />
+  );
+};
+
+const LifestyleHeadline = ({ scene, local }: { scene: LifestyleScene; local: number }) => {
+  const opacity = interpolate(local, [0, 12, scene.duration - 18, scene.duration], [0, 1, 1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const y = interpolate(local, [0, 20], [28, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: ease,
+  });
+
+  return (
+    <h1
+      style={{
+        ...styles.lifestyleHeadline,
+        top: scene.align === "bottom" ? 1220 : 116,
+        opacity,
+        transform: `translateY(${y}px)`,
+      }}
+    >
+      {scene.text}
+    </h1>
+  );
+};
+
+const LifestyleTag = ({ text, local }: { text: string; local: number }) => {
+  const opacity = interpolate(local, [16, 28], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return <div style={{ ...styles.lifestyleTag, opacity }}>{text}</div>;
 };
 
 const Effect = ({ kind, local }: { kind?: Scene["effect"]; local: number }) => {
@@ -398,8 +543,81 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 850,
     color: "rgba(255,255,255,0.88)",
   },
+  lifestyleImage: {
+    position: "absolute",
+    inset: "-42px -42px",
+    width: "calc(100% + 84px)",
+    height: "calc(100% + 84px)",
+    objectFit: "cover",
+    display: "block",
+  },
+  photoShade: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.18) 38%, rgba(0,0,0,0.24) 58%, rgba(0,0,0,0.72) 100%)",
+  },
+  lifestyleHeadline: {
+    position: "absolute",
+    left: 70,
+    right: 70,
+    margin: 0,
+    color: "#ffffff",
+    fontSize: 88,
+    lineHeight: 0.95,
+    letterSpacing: 0,
+    fontWeight: 950,
+    textShadow: "0 18px 60px rgba(0,0,0,0.72)",
+    textWrap: "balance",
+  },
+  lifestyleTag: {
+    position: "absolute",
+    left: 72,
+    bottom: 226,
+    minWidth: 250,
+    height: 58,
+    padding: "0 26px",
+    borderRadius: 999,
+    display: "inline-grid",
+    placeItems: "center",
+    background: "rgba(53, 232, 189, 0.94)",
+    color: "#03110d",
+    fontSize: 27,
+    fontWeight: 950,
+    boxShadow: "0 18px 50px rgba(0,0,0,0.28)",
+  },
+  lifestyleFooter: {
+    position: "absolute",
+    left: 70,
+    right: 70,
+    bottom: 58,
+    textAlign: "center",
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 30,
+    fontWeight: 900,
+    textShadow: "0 12px 32px rgba(0,0,0,0.72)",
+  },
+  lifestyleFinal: {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 76,
+    textAlign: "center",
+    background: "rgba(3,4,7,0.86)",
+  },
+  lifestyleFinalText: {
+    maxWidth: 910,
+    fontSize: 82,
+    lineHeight: 0.96,
+    fontWeight: 950,
+    letterSpacing: 0,
+  },
 };
 
 export const VIDEO_FPS = fps;
 export const FULL_DURATION = fullDuration;
 export const LOOP_DURATION = loopDuration;
+export const LIFESTYLE_DURATION = lifestyleDuration;

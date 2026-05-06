@@ -1,11 +1,15 @@
 import { Composition } from "remotion";
 import {
   FULL_DURATION,
+  FieldFollowUp,
   HandshakeToCrm,
   HandshakeToCrmLoop,
+  LIFESTYLE_DURATION,
+  MeetingMoment,
   LOOP_DURATION,
   NetworkingUpgrade,
   NetworkingUpgradeLoop,
+  OpenHouseLeads,
   StopLosingLeads,
   StopLosingLeadsLoop,
   VIDEO_FPS,
@@ -54,6 +58,24 @@ export const RemotionRoot = () => {
         id="NetworkingUpgradeLoop"
         component={NetworkingUpgradeLoop}
         durationInFrames={LOOP_DURATION}
+        {...shared}
+      />
+      <Composition
+        id="MeetingMoment"
+        component={MeetingMoment}
+        durationInFrames={LIFESTYLE_DURATION}
+        {...shared}
+      />
+      <Composition
+        id="FieldFollowUp"
+        component={FieldFollowUp}
+        durationInFrames={LIFESTYLE_DURATION}
+        {...shared}
+      />
+      <Composition
+        id="OpenHouseLeads"
+        component={OpenHouseLeads}
+        durationInFrames={LIFESTYLE_DURATION}
         {...shared}
       />
     </>
